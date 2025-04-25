@@ -8,7 +8,6 @@ import javax.lang.model.element.TypeElement;
 import com.sun.source.doctree.DocCommentTree;
 
 import jdk.javadoc.doclet.DocletEnvironment;
-import ortus.boxlang.runtime.dynamic.casters.StringCaster;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.IStruct.TYPES;
@@ -23,8 +22,7 @@ public class ExceptionDocumentationGenerator {
 	private static final String	docsBasePath			= "docs/boxlang-language/reference/";
 	private static final String	templatesBasePath		= "templates/";
 	private static final String	ExceptionDocPath		= docsBasePath + "Exceptions.md";
-	private static final String	blankExceptionTemplate	= StringCaster
-	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "ExceptionDocTemplate.md" ) ) );
+	private static final String	blankExceptionTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "ExceptionDocTemplate.md" );
 
 	public static void generate( DocletEnvironment docsEnvironment ) {
 		IStruct exceptionsData = new Struct( TYPES.LINKED );

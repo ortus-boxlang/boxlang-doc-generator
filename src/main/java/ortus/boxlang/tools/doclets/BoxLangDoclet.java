@@ -1,19 +1,17 @@
 package ortus.boxlang.tools.doclets;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Path;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 import org.apache.commons.lang3.StringUtils;
 
 import jdk.javadoc.doclet.DocletEnvironment;
 import jdk.javadoc.doclet.StandardDoclet;
-import ortus.boxlang.runtime.dynamic.casters.StringCaster;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.exceptions.BoxIOException;
-import ortus.boxlang.runtime.types.exceptions.BoxRuntimeException;
 import ortus.boxlang.runtime.util.FileSystemUtil;
 import ortus.boxlang.tools.util.BIFDocumentationGenerator;
 import ortus.boxlang.tools.util.ComponentDocumentationGenerator;
@@ -25,7 +23,7 @@ public class BoxLangDoclet extends StandardDoclet {
 	private static final String	docsBasePath		= "docs/";
 	private static final String	docsDestinationPath	= "docs/boxlang-language/reference/";
 	private static final String	templatesBasePath	= "templates/";
-	private static final String	navTemplate			= getTemplatePath( templatesBasePath + "NavTemplate.md" );
+	private static final String	navTemplate			= getTemplateSource( templatesBasePath + "NavTemplate.md" );
 	private static final String	summaryPath			= docsBasePath + "Summary.md";
 
 	@Override
@@ -57,7 +55,7 @@ public class BoxLangDoclet extends StandardDoclet {
 				FileSystemUtil.deleteFile( summaryFile );
 			}
 
-			String summaryContents = StringCaster.cast( FileSystemUtil.read( navTemplate ) );
+			String summaryContents = navTemplate;
 			// BIF Docs
 			System.out.println( "Generating BIF documentation" );
 			IStruct bifNav = BIFDocumentationGenerator.generate( environment );
@@ -85,12 +83,17 @@ public class BoxLangDoclet extends StandardDoclet {
 		return true;
 	}
 
-	public static String getTemplatePath( String templatePath ) {
-		URL resourceUrl = BoxLangDoclet.class.getClassLoader().getResource( templatePath );
-		try {
-			return Path.of( resourceUrl.toURI() ).toAbsolutePath().toString();
-		} catch ( URISyntaxException e ) {
-			throw new BoxRuntimeException( "Failed to get template path for " + templatePath, e );
+	public static String getTemplateSource( String templatePath ) {
+		InputStream inputStream = BoxLangDoclet.class.getClassLoader().getResourceAsStream( templatePath );
+		try ( BufferedReader reader = new BufferedReader( new InputStreamReader( inputStream ) ) ) {
+			StringBuilder	stringBuilder	= new StringBuilder();
+			String			line;
+			while ( ( line = reader.readLine() ) != null ) {
+				stringBuilder.append( line ).append( "\n" );
+			}
+			return stringBuilder.toString();
+		} catch ( IOException e ) {
+			throw new BoxIOException( "Error reading template file: " + templatePath, e );
 		}
 	}
 

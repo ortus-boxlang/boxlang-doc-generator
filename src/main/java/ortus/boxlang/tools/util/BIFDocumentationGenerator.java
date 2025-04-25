@@ -37,8 +37,7 @@ public class BIFDocumentationGenerator {
 	private static final String	docsBasePath		= "docs/boxlang-language/reference/";
 	private static final String	templatesBasePath	= "templates/";
 	private static final String	BIFDocsPath			= docsBasePath + "built-in-functions";
-	private static final String	blankBIFTemplate	= StringCaster
-	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "BIFDocTemplate.md" ) ) );
+	private static final String	blankBIFTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "BIFDocTemplate.md" );
 	private static final String	bifNavToken			= "(dynamic-bif-nav)";
 
 	@SuppressWarnings( "unchecked" )

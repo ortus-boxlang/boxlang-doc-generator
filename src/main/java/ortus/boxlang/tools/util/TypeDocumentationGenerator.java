@@ -44,8 +44,7 @@ public class TypeDocumentationGenerator {
 	private static final String					docsBasePath		= "docs/boxlang-language/reference/";
 	private static final String					templatesBasePath	= "templates/";
 	private static final String					TypeDocsPath		= docsBasePath + "types";
-	private static final String					blankTypeTemplate	= StringCaster
-	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "TypeDocTemplate.md" ) ) );
+	private static final String					blankTypeTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "TypeDocTemplate.md" );
 	private static final String					navToken			= "(dynamic-types-nav)";
 
 	private static final BoxRuntime				runtime				= BoxRuntime.getInstance();
