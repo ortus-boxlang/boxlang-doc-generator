@@ -73,7 +73,9 @@ public class BoxLangDoclet extends StandardDoclet {
 
 			System.out.println( "Generating Exception documentation" );
 			ExceptionDocumentationGenerator.generate( environment );
-			summaryContents += "  * [Exceptions](boxlang-language/reference/Exceptions.md)";
+			if ( FileSystemUtil.exists( ExceptionDocumentationGenerator.ExceptionDocPath ) ) {
+				summaryContents += "  * [Exceptions](boxlang-language/reference/Exceptions.md)";
+			}
 
 			// Write out the menu with the new links
 			FileSystemUtil.write( summaryPath, summaryContents, "utf-8", true );

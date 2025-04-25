@@ -336,6 +336,10 @@ public class TypeDocumentationGenerator {
 			typeDescription += "\n\n## Examples\n\n" + typeSamplesContent;
 		}
 
+		if ( typeMethods.isEmpty() ) {
+			return;
+		}
+
 		typeDocs	= typeDocs.replace( "{TypeName}", typeKey.getName() );
 		typeDocs	= typeDocs.replace( "{TypeDescription}", typeDescription == null ? "" : typeDescription );
 		typeDocs	= typeDocs.replace( "{TypeMethods}", typeMethods );

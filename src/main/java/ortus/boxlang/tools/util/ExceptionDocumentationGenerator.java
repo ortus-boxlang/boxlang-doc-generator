@@ -21,7 +21,7 @@ public class ExceptionDocumentationGenerator {
 
 	private static final String	docsBasePath			= "docs/boxlang-language/reference/";
 	private static final String	templatesBasePath		= "templates/";
-	private static final String	ExceptionDocPath		= docsBasePath + "Exceptions.md";
+	public static final String	ExceptionDocPath		= docsBasePath + "Exceptions.md";
 	private static final String	blankExceptionTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "ExceptionDocTemplate.md" );
 
 	public static void generate( DocletEnvironment docsEnvironment ) {
@@ -61,6 +61,9 @@ public class ExceptionDocumentationGenerator {
 								} )
 		    .collect( Collectors.joining( "\n" ) );
 
+		if ( docContents.isEmpty() ) {
+			return;
+		}
 		ExceptionDocs = ExceptionDocs.replace( "{Exceptions}", docContents );
 		FileSystemUtil.write( ExceptionDocPath, ExceptionDocs, "utf-8", true );
 	}
