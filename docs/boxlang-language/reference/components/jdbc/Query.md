@@ -35,7 +35,7 @@ clientInfo=[struct] />
 | `columnKey` | `string` | `false` |  |  |
 | `dbtype` | `string` | `false` |  |  |
 | `maxRows` | `integer` | `false` |  | `-1` |
-| `blockfactor` | `integer` | `false` |  | `[ortus.boxlang.runtime.validation.dynamic.Max@ecf9fb3, ortus.boxlang.runtime.validation.dynamic.Min@2d35442b]` |
+| `blockfactor` | `integer` | `false` |  | `[ortus.boxlang.runtime.validation.dynamic.Min@2d35442b, ortus.boxlang.runtime.validation.dynamic.Max@27f9e982]` |
 | `fetchsize` | `integer` | `false` |  |  |
 | `timeout` | `integer` | `false` |  |  |
 | `cache` | `boolean` | `false` |  | `false` |

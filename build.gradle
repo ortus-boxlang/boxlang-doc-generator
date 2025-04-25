@@ -69,6 +69,15 @@ compileJava {
 	options.debug()
 }
 
+sourceSets {
+    main {
+        resources {
+            srcDirs = [ 'src/main/resources' ]
+            include '**/*.md'
+        }
+    }
+}
+
 compileTestJava {
 	source sourceSets.test.java
 	dependsOn compileJava, serviceLoaderBuild

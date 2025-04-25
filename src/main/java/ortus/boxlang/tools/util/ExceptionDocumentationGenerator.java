@@ -16,13 +16,15 @@ import ortus.boxlang.runtime.types.Struct;
 import ortus.boxlang.runtime.types.exceptions.BoxLangException;
 import ortus.boxlang.runtime.types.exceptions.BoxRuntimeException;
 import ortus.boxlang.runtime.util.FileSystemUtil;
+import ortus.boxlang.tools.doclets.BoxLangDoclet;
 
 public class ExceptionDocumentationGenerator {
 
 	private static final String	docsBasePath			= "docs/boxlang-language/reference/";
-	private static final String	templatesBasePath		= "src/main/resources/templates/";
+	private static final String	templatesBasePath		= "templates/";
 	private static final String	ExceptionDocPath		= docsBasePath + "Exceptions.md";
-	private static final String	blankExceptionTemplate	= StringCaster.cast( FileSystemUtil.read( templatesBasePath + "ExceptionDocTemplate.md" ) );
+	private static final String	blankExceptionTemplate	= StringCaster
+	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "ExceptionDocTemplate.md" ) ) );
 
 	public static void generate( DocletEnvironment docsEnvironment ) {
 		IStruct exceptionsData = new Struct( TYPES.LINKED );

@@ -30,13 +30,15 @@ import ortus.boxlang.runtime.types.exceptions.BoxRuntimeException;
 import ortus.boxlang.runtime.types.util.BLCollector;
 import ortus.boxlang.runtime.util.FileSystemUtil;
 import ortus.boxlang.runtime.validation.Validator;
+import ortus.boxlang.tools.doclets.BoxLangDoclet;
 
 public class ComponentDocumentationGenerator {
 
 	private static final String	docsBasePath			= "docs/boxlang-language/reference/";
-	private static final String	templatesBasePath		= "src/main/resources/templates/";
+	private static final String	templatesBasePath		= "templates/";
 	private static final String	ComponentDocsPath		= docsBasePath + "components";
-	private static final String	blankComponentTemplate	= StringCaster.cast( FileSystemUtil.read( templatesBasePath + "ComponentDocTemplate.md" ) );
+	private static final String	blankComponentTemplate	= StringCaster
+	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "ComponentDocTemplate.md" ) ) );
 	private static final String	navToken				= "(dynamic-components-nav)";
 
 	@SuppressWarnings( "unchecked" )

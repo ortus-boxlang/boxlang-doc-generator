@@ -30,13 +30,15 @@ import ortus.boxlang.runtime.types.Struct;
 import ortus.boxlang.runtime.types.exceptions.BoxRuntimeException;
 import ortus.boxlang.runtime.types.util.BLCollector;
 import ortus.boxlang.runtime.util.FileSystemUtil;
+import ortus.boxlang.tools.doclets.BoxLangDoclet;
 
 public class BIFDocumentationGenerator {
 
 	private static final String	docsBasePath		= "docs/boxlang-language/reference/";
-	private static final String	templatesBasePath	= "src/main/resources/templates/";
+	private static final String	templatesBasePath	= "templates/";
 	private static final String	BIFDocsPath			= docsBasePath + "built-in-functions";
-	private static final String	blankBIFTemplate	= StringCaster.cast( FileSystemUtil.read( templatesBasePath + "BIFDocTemplate.md" ) );
+	private static final String	blankBIFTemplate	= StringCaster
+	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "BIFDocTemplate.md" ) ) );
 	private static final String	bifNavToken			= "(dynamic-bif-nav)";
 
 	@SuppressWarnings( "unchecked" )

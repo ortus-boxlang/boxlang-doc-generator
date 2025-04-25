@@ -37,13 +37,15 @@ import ortus.boxlang.runtime.types.util.BLCollector;
 import ortus.boxlang.runtime.types.util.StringUtil;
 import ortus.boxlang.runtime.types.util.StructUtil;
 import ortus.boxlang.runtime.util.FileSystemUtil;
+import ortus.boxlang.tools.doclets.BoxLangDoclet;
 
 public class TypeDocumentationGenerator {
 
 	private static final String					docsBasePath		= "docs/boxlang-language/reference/";
-	private static final String					templatesBasePath	= "src/main/resources/templates/";
+	private static final String					templatesBasePath	= "templates/";
 	private static final String					TypeDocsPath		= docsBasePath + "types";
-	private static final String					blankTypeTemplate	= StringCaster.cast( FileSystemUtil.read( templatesBasePath + "TypeDocTemplate.md" ) );
+	private static final String					blankTypeTemplate	= StringCaster
+	    .cast( FileSystemUtil.read( BoxLangDoclet.getTemplatePath( templatesBasePath + "TypeDocTemplate.md" ) ) );
 	private static final String					navToken			= "(dynamic-types-nav)";
 
 	private static final BoxRuntime				runtime				= BoxRuntime.getInstance();
