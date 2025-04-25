@@ -51,6 +51,7 @@ public class BIFDocumentationGenerator {
 		docsEnvironment.getSpecifiedElements()
 		    .stream()
 		    .filter( elem -> elem.getKind().equals( ElementKind.CLASS ) && elem.getAnnotationsByType( BoxBIF.class ).length > 0 )
+		    .peek( elem -> System.out.println( "Registering BIF: " + elem.getSimpleName() ) )
 		    .forEach( elem -> {
 			    functionService.processBIFRegistration( ( Class ) elem.getClass(), null, null );
 		    } );

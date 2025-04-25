@@ -49,6 +49,7 @@ public class ComponentDocumentationGenerator {
 		docsEnvironment.getSpecifiedElements()
 		    .stream()
 		    .filter( elem -> elem.getKind().equals( ElementKind.CLASS ) && elem.getAnnotationsByType( BoxComponent.class ).length > 0 )
+		    .peek( elem -> System.out.println( "Registering Component: " + elem.getSimpleName() ) )
 		    .forEach( elem -> {
 			    componentService.registerComponent( ( Class ) elem.getClass(), null, null );
 		    } );
