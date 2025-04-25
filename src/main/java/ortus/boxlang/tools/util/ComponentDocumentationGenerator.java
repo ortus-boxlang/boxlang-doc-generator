@@ -140,6 +140,8 @@ public class ComponentDocumentationGenerator {
 		String			ComponentDescPlaceholder			= "{ComponentDescription}";
 		String			ComponentAttributesPlaceholder		= "{ComponentAttributes}";
 		String			ComponentAttributesTablePlaceholder	= "{ComponentAttributesTable}";
+		String			ComponentSamplesPlaceholder			= "{BIFSamples}";
+		String			samplesPath							= "workbench/samples/components";
 		String			PackageNavPlaceholder				= "{PackageNav}";
 
 		if ( !FileSystemUtil.exists( componentFile ) ) {
@@ -258,12 +260,20 @@ public class ComponentDocumentationGenerator {
 				    .collect( Collectors.joining( "\n" ) );
 
 			}
-			String	packageNav	= "";
-			String	contents	= blankComponentTemplate.replace( ComponentNamePlaceholder, name )
+			String	packageNav			= "";
+			// Retrive any samples in our convention location
+			String	componentSamples	= samplesPath + "/" + path + "/" + name + ".md";
+			String	sampleDoc			= "";
+			if ( FileSystemUtil.exists( componentSamples ) ) {
+				sampleDoc = StringCaster.cast( FileSystemUtil.read( componentSamples ) );
+			}
+
+			String contents = blankComponentTemplate.replace( ComponentNamePlaceholder, name )
 			    .replace( ComponentDescPlaceholder, description )
 			    .replace( ComponentAttributesPlaceholder, attributesInline )
 			    .replace( ComponentAttributesTablePlaceholder, attributesTable )
-			    .replace( PackageNavPlaceholder, packageNav );
+			    .replace( PackageNavPlaceholder, packageNav )
+			    .replace( ComponentSamplesPlaceholder, sampleDoc );
 			FileSystemUtil.write( componentFile, contents, "utf-8", true );
 			return new HashMap<String, String>() {
 
