@@ -61,8 +61,6 @@ public class TypeDocumentationGenerator {
 
 	public static IStruct generate( DocletEnvironment docsEnvironment ) {
 
-		System.out.println( "Generating type documentation for " + functionService.getGlobalFunctionCount() + " global functions" );
-
 		if ( functionService.getGlobalFunctionCount() == 0 ) {
 			docsEnvironment.getSpecifiedElements()
 			    .stream()
@@ -76,21 +74,11 @@ public class TypeDocumentationGenerator {
 
 		docsEnvironment.getSpecifiedElements()
 		    .stream()
-
-		    .peek( elem -> {
-			    if ( elem.getKind().equals( ElementKind.CLASS ) ) {
-				    System.out.println( "Found class element: " + elem.getSimpleName() );
-			    }
-			    if ( elem.getKind().equals( ElementKind.CLASS ) && Stream.of( elem.getAnnotationsByType( BoxMember.class ) ).count() > 0 ) {
-				    System.out.println( "Found pre-filter type: " + elem.getSimpleName() );
-			    }
-		    } )
 		    .filter( elem -> elem.getKind().equals( ElementKind.CLASS )
 		        && Stream.of( elem.getAnnotationsByType( BoxMember.class ) )
 		            // filter out any member functions which are marked for deprecation or have no other member functions except utility functions
 		            .filter( annotation -> !annotation.deprecated() && !annotation.name().equals( "dump" ) && !annotation.name().equals( "toJSON" ) )
 		            .toArray().length > 0 )
-		    .peek( elem -> System.out.println( "Found type: " + elem.getSimpleName() ) )
 		    .forEach( elem -> {
 			    Stream.of( elem.getAnnotationsByType( BoxMember.class ) )
 			        .filter( member -> !excludedTypes.contains( member.type() ) )
