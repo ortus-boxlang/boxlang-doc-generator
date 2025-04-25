@@ -9,6 +9,8 @@ import java.util.stream.Stream;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.sun.source.doctree.BlockTagTree;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
@@ -46,17 +48,28 @@ public class ComponentDocumentationGenerator {
 		BoxRuntime			runtime				= BoxRuntime.getInstance();
 		ComponentService	componentService	= runtime.getComponentService();
 
+		Array				newComponents		= new Array();
+
 		docsEnvironment.getSpecifiedElements()
 		    .stream()
 		    .filter( elem -> elem.getKind().equals( ElementKind.CLASS ) && elem.getAnnotationsByType( BoxComponent.class ).length > 0 )
 		    .peek( elem -> System.out.println( "Registering Component: " + elem.getSimpleName() ) )
 		    .forEach( elem -> {
 			    componentService.registerComponent( ( Class ) elem.getClass(), null, null );
+			    Stream.of( elem.getAnnotationsByType( BoxComponent.class ) )
+			        .forEach( annotation -> {
+				        String alias = annotation.alias();
+				        if ( StringUtils.isNotBlank( alias ) ) {
+					        newComponents.add( alias );
+				        } else {
+					        newComponents.add( elem.getSimpleName().toString() );
+				        }
+			        } );
 		    } );
 
-		Array			newComponents	= new Array( componentService.getComponentNames() );
+		System.out.println( "New Component list: " + newComponents );
 
-		List<Element>	docElements		= docsEnvironment.getSpecifiedElements()
+		List<Element> docElements = docsEnvironment.getSpecifiedElements()
 		    .stream()
 		    .filter( elem -> elem.getAnnotationsByType( BoxComponent.class ).length > 0 )
 		    .peek( elem -> elem.getSimpleName() )
@@ -113,17 +126,21 @@ public class ComponentDocumentationGenerator {
 
 	public static HashMap<String, String> ensureComponentTemplate( ComponentDescriptor component, List<Element> docElements,
 	    DocletEnvironment docsEnvironment ) {
-		String		name								= component.name.getName();
-		String[]	packageParts						= component.componentClass.getName().split( "\\." );
-		String		path								= packageParts[ packageParts.length - 2 ];
-		String		fileName							= name + ".md";
-		String		relativePath						= path + '/' + fileName;
-		String		componentFile						= ComponentDocsPath + '/' + relativePath;
-		String		ComponentNamePlaceholder			= "{ComponentName}";
-		String		ComponentDescPlaceholder			= "{ComponentDescription}";
-		String		ComponentAttributesPlaceholder		= "{ComponentAttributes}";
-		String		ComponentAttributesTablePlaceholder	= "{ComponentAttributesTable}";
-		String		PackageNavPlaceholder				= "{PackageNav}";
+		String		name			= component.name.getName();
+		String[]	packageParts	= component.componentClass.getName().split( "\\." );
+		String		evalPath		= packageParts[ packageParts.length - 2 ];
+		if ( evalPath.equals( "components" ) ) {
+			evalPath = packageParts[ packageParts.length - 3 ];
+		}
+		final String	path								= evalPath;
+		String			fileName							= name + ".md";
+		String			relativePath						= path + '/' + fileName;
+		String			componentFile						= ComponentDocsPath + '/' + relativePath;
+		String			ComponentNamePlaceholder			= "{ComponentName}";
+		String			ComponentDescPlaceholder			= "{ComponentDescription}";
+		String			ComponentAttributesPlaceholder		= "{ComponentAttributes}";
+		String			ComponentAttributesTablePlaceholder	= "{ComponentAttributesTable}";
+		String			PackageNavPlaceholder				= "{PackageNav}";
 
 		if ( !FileSystemUtil.exists( componentFile ) ) {
 			Key		componentKey		= Key.of( name );

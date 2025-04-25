@@ -9,6 +9,8 @@ import java.util.stream.Stream;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.sun.source.doctree.BlockTagTree;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
@@ -47,6 +49,7 @@ public class BIFDocumentationGenerator {
 		FunctionService	functionService			= runtime.getFunctionService();
 		String			PackageNavPlaceholder	= "{PackageNav}";
 
+		Array			newBifs					= new Array();
 		// Register all BIFs as the Javdoc runtime will not auto-register them.
 		docsEnvironment.getSpecifiedElements()
 		    .stream()
@@ -54,12 +57,21 @@ public class BIFDocumentationGenerator {
 		    .peek( elem -> System.out.println( "Registering BIF: " + elem.getSimpleName() ) )
 		    .forEach( elem -> {
 			    functionService.processBIFRegistration( ( Class ) elem.getClass(), null, null );
+			    Stream.of( elem.getAnnotationsByType( BoxBIF.class ) )
+			        .forEach( annotation -> {
+				        String alias = annotation.alias();
+				        if ( StringUtils.isNotBlank( alias ) ) {
+					        newBifs.add( alias );
+				        } else {
+					        newBifs.add( elem.getSimpleName().toString() );
+				        }
+			        } );
 		    } );
 
-		Array			newBifs		= new Array( functionService.getGlobalFunctionNames() );
+		System.out.println( "New BIF list: " + newBifs );
 
 		// Create an array of all BIFs for further processing
-		List<Element>	docElements	= docsEnvironment.getSpecifiedElements()
+		List<Element> docElements = docsEnvironment.getSpecifiedElements()
 		    .stream()
 		    .filter( elem -> elem.getAnnotationsByType( BoxBIF.class ).length > 0 )
 		    .map( elem -> ( Element ) elem )
@@ -151,10 +163,14 @@ public class BIFDocumentationGenerator {
 	 * @return
 	 */
 	public static HashMap<String, String> generateBIFTemplate( IStruct bifRecord, List<Element> docElements, DocletEnvironment docsEnvironment ) {
-		BIFDescriptor	bif						= ( BIFDescriptor ) bifRecord.get( Key.boxBif );
-		String			name					= bifRecord.getAsString( Key._NAME );
-		String[]		packageParts			= bif.BIFClass.getName().split( "\\." );
-		String			path					= packageParts[ packageParts.length - 2 ];
+		BIFDescriptor	bif				= ( BIFDescriptor ) bifRecord.get( Key.boxBif );
+		String			name			= bifRecord.getAsString( Key._NAME );
+		String[]		packageParts	= bif.BIFClass.getName().split( "\\." );
+		String			evalPath		= packageParts[ packageParts.length - 2 ];
+		if ( evalPath.equals( "bifs" ) ) {
+			evalPath = packageParts[ packageParts.length - 3 ];
+		}
+		final String	path					= evalPath;
 		String			fileName				= name + ".md";
 		String			relativePath			= path + '/' + fileName;
 		String			bifFile					= BIFDocsPath + '/' + relativePath;
