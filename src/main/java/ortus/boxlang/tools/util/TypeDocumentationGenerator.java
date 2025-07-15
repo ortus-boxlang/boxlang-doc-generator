@@ -89,6 +89,7 @@ public class TypeDocumentationGenerator {
 					        memberName = StringUtils.replaceOnceIgnoreCase( elem.getSimpleName().toString(), member.type().getKey().getName(), "" );
 				        }
 				        memberName = memberName.substring( 0, 1 ).toLowerCase() + memberName.substring( 1 );
+				        final String finalMemberName = memberName;
 				        if ( !typesData.containsKey( typeKey ) ) {
 					        typesData.put( typeKey, new Struct( TYPES.LINKED ) );
 					        typesData.getAsStruct( typeKey ).put( Key.functions, new Struct( TYPES.LINKED ) );
@@ -108,9 +109,19 @@ public class TypeDocumentationGenerator {
 						        DocCommentTree commentTree = docsEnvironment.getDocTrees().getDocCommentTree( typeClass );
 						        String	description	= "";
 						        if ( commentTree != null ) {
-							        description = ( commentTree.getFirstSentence().stream().map( sentence -> sentence.toString() )
-							            .collect( Collectors.joining( "" ) ) + "\n\n"
-							            + commentTree.getPreamble().toString() + commentTree.getBody().toString().trim() ).trim();
+							        DocTree specificDescription = commentTree.getBlockTags().stream()
+							            .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG ) && tag.toString().contains( "@function" )
+							                && ( ( BlockTagTree ) tag ).getTagName().equals( "function." + finalMemberName ) )
+							            .findFirst().orElse( null );
+							        if ( specificDescription != null ) {
+								        description = ( ( BlockTagTree ) specificDescription ).toString()
+								            .replace( '@' + ( ( BlockTagTree ) specificDescription ).getTagName(), "" ).trim();
+							        } else {
+								        description = ( commentTree.getFirstSentence().stream().map( sentence -> sentence.toString() )
+								            .collect( Collectors.joining( "" ) )
+								            + "\n\n"
+								            + commentTree.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) ).trim();
+							        }
 						        }
 						        typesData.put( typeKey, new Struct( StructUtil.getCommonComparators().get( Key.of( "textAsc" ) ) ) );
 						        typesData.getAsStruct( typeKey ).put( Key.description, description );

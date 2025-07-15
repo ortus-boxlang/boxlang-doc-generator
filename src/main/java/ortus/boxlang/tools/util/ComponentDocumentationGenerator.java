@@ -79,6 +79,7 @@ public class ComponentDocumentationGenerator {
 		try {
 			Array	componentInfos	= newComponents.stream()
 			    .map( componentName -> ( ComponentDescriptor ) componentService.getComponent( StringCaster.cast( componentName ) ) )
+			    .filter( component -> component != null )
 			    .map( component -> ensureComponentTemplate( component, docElements, docsEnvironment ) )
 			    .collect( BLCollector.toArray() )
 			    .stream()

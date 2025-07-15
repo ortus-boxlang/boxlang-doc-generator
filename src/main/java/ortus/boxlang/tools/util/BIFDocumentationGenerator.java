@@ -95,9 +95,12 @@ public class BIFDocumentationGenerator {
 			// Create our group navigation links, which will be placed in the Summary navigation
 			Struct	groupLinks	= new Struct();
 			bifInfos.stream()
-			    .forEach( bifInfo -> {
-				    HashMap<String, String> bifMeta	= ( ( HashMap<String, String> ) bifInfo );
-				    Key					groupKey	= Key.of( bifMeta.get( "package" ) );
+			    .map( bifInfo -> ( HashMap<String, String> ) bifInfo )
+			    .sorted(
+			        ( a, b ) -> ortus.boxlang.runtime.operators.Compare.invoke( StringCaster.cast( a.get( "name" ) ),
+			            StringCaster.cast( b.get( "name" ) ), false ) )
+			    .forEach( bifMeta -> {
+				    Key groupKey = Key.of( bifMeta.get( "package" ) );
 
 				    if ( !groupLinks.containsKey( groupKey ) ) {
 					    groupLinks.put( groupKey, new Array() );
@@ -108,15 +111,21 @@ public class BIFDocumentationGenerator {
 			// Loop over our groups and generate individual BIF sub-nav
 			bifInfos.stream()
 			    .map( bifInfo -> ( HashMap<String, String> ) bifInfo )
+			    .sorted(
+			        ( a, b ) -> ortus.boxlang.runtime.operators.Compare.invoke( StringCaster.cast( a.get( "name" ) ),
+			            StringCaster.cast( b.get( "name" ) ), false ) )
 			    .forEach( bifMeta -> {
 				    String packageNav = bifInfos.stream()
 				        .map( bifInfo -> ( HashMap<String, String> ) bifInfo )
 				        .filter( bifInfo -> bifInfo.get( "package" )
 				            .equals( bifMeta.get( "package" ) )
 				            && !bifInfo.get( "name" ).equals( bifMeta.get( "name" ) ) )
+				        .sorted(
+				            ( a, b ) -> ortus.boxlang.runtime.operators.Compare.invoke( StringCaster.cast( a.get( "name" ) ),
+				                StringCaster.cast( b.get( "name" ) ), false ) )
 				        .map( bifInfo -> {
-										        return "  * [" + bifInfo.get( "name" ) + "](./" + bifInfo.get( "fileName" ) + ")";
-									        } )
+					        return "  * [" + bifInfo.get( "name" ) + "](./" + bifInfo.get( "fileName" ) + ")";
+				        } )
 				        .collect( Collectors.joining( "\n" ) );
 				    String contents	= bifMeta.get( "template" );
 				    contents = contents.replace( PackageNavPlaceholder, packageNav );
