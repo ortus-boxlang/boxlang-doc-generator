@@ -123,7 +123,7 @@ public class TypeDocumentationGenerator {
 								            + commentTree.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) ).trim();
 							        }
 						        }
-						        typesData.put( typeKey, new Struct( StructUtil.getCommonComparators().get( Key.of( "textAsc" ) ) ) );
+						        typesData.put( typeKey, new Struct( StructUtil.getCommonKeyComparators().get( Key.of( "textAsc" ) ) ) );
 						        typesData.getAsStruct( typeKey ).put( Key.description, description );
 						        typesData.getAsStruct( typeKey ).put( Key.functions, new Struct( TYPES.SORTED ) );
 

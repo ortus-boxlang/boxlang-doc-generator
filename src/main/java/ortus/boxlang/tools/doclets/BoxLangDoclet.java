@@ -34,20 +34,21 @@ public class BoxLangDoclet extends StandardDoclet {
 	@Override
 	public boolean run( DocletEnvironment environment ) {
 		try {
+			boolean primitiveTrue = true;
 
 			System.out.println( "Removing previous documentation artifacts" );
 			String typesDirectory = docsDestinationPath + "types";
 			if ( FileSystemUtil.exists( typesDirectory ) ) {
-				FileSystemUtil.deleteDirectory( typesDirectory, true );
+				FileSystemUtil.deleteDirectory( typesDirectory, primitiveTrue );
 			}
 			String componentsDirectory = docsDestinationPath + "components";
 			if ( FileSystemUtil.exists( componentsDirectory ) ) {
-				FileSystemUtil.deleteDirectory( componentsDirectory, true );
+				FileSystemUtil.deleteDirectory( componentsDirectory, primitiveTrue );
 			}
 
 			String bifsDirectory = docsDestinationPath + "built-in-functions";
 			if ( FileSystemUtil.exists( bifsDirectory ) ) {
-				FileSystemUtil.deleteDirectory( bifsDirectory, true );
+				FileSystemUtil.deleteDirectory( bifsDirectory, primitiveTrue );
 			}
 
 			String summaryFile = docsBasePath + "Summary.md";
@@ -78,7 +79,7 @@ public class BoxLangDoclet extends StandardDoclet {
 			}
 
 			// Write out the menu with the new links
-			FileSystemUtil.write( summaryPath, summaryContents, "utf-8", true );
+			FileSystemUtil.write( summaryPath, summaryContents, "utf-8", primitiveTrue );
 		} catch ( IOException e ) {
 			throw new BoxIOException( e );
 		}
