@@ -50,7 +50,7 @@ dependencies {
 	// For HTML Parsing
 	implementation 'org.jsoup:jsoup:1.19.1'
 	// Testing Frameworks
-	testImplementation "org.junit.jupiter:junit-jupiter:5.+"
+	testImplementation "org.junit.jupiter:junit-jupiter:6.+"
 	testImplementation "org.mockito:mockito-core:5.+"
 	testImplementation "com.google.truth:truth:1.+"
 	// Explicitly declare the JUnit platform launcher (to avoid deprecation)
