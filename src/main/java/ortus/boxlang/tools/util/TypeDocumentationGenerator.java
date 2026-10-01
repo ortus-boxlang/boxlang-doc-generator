@@ -278,6 +278,15 @@ public class TypeDocumentationGenerator {
 		return description;
 	}
 
+	/**
+	 * Retrieves the structured data for a member function of a BoxLang type, including its arguments and documentation.
+	 * 
+	 * @param parent
+	 * @param memberElement
+	 * @param docsEnvironment
+	 * 
+	 * @return
+	 */
 	private static IStruct getMemberFunctionData( Element parent, BoxMember memberElement, DocletEnvironment docsEnvironment ) {
 		IStruct		memberData	= Struct.of( Key.arguments, new Struct( TYPES.LINKED ) );
 		BoxLangType	memberType	= memberElement.type();
