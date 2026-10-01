@@ -3,12 +3,15 @@ package ortus.boxlang.tools.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
 import org.apache.commons.lang3.StringUtils;
@@ -46,6 +49,27 @@ public class TypeDocumentationGenerator {
 	private static final String					TypeDocsPath		= docsBasePath + "types";
 	private static final String					blankTypeTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "TypeDocTemplate.md" );
 	private static final String					navToken			= "(dynamic-types-nav)";
+	private static final String					descriptionsPath	= "workbench/descriptions/types";
+	private static final Pattern				INLINE_TAG			= Pattern.compile( "\\{@(code|literal|link|linkplain)\\s+([^}]*)\\}" );
+	private static final Pattern				UNICODE_ESCAPE		= Pattern.compile( "\\\\u([0-9a-fA-F]{4})" );
+
+	// BoxLang types whose class in the runtime `types` package is not named after the type
+	private static final Map<String, String>	boxTypeClasses		= Map.of(
+	    "file", "boxfile",
+	    "set", "boxset",
+	    "stringbuilderstrict", "boxstringbuilder"
+	);
+
+	// Types with no BoxLang class are represented by a native Java class
+	private static final Map<String, String>	nativeTypeClasses	= Map.of(
+	    "any", "java.lang.Object",
+	    "boolean", "java.lang.Boolean",
+	    "class", "ortus.boxlang.runtime.runnables.IClassRunnable",
+	    "numeric", "java.lang.Number",
+	    "stream", "java.util.stream.Stream",
+	    "string", "java.lang.String",
+	    "stringbuilder", "java.lang.StringBuilder"
+	);
 
 	private static final BoxRuntime				runtime				= BoxRuntime.getInstance();
 	private static final FunctionService		functionService		= runtime.getFunctionService();
@@ -93,16 +117,19 @@ public class TypeDocumentationGenerator {
 				        if ( !typesData.containsKey( typeKey ) ) {
 					        typesData.put( typeKey, new Struct( TYPES.LINKED ) );
 					        typesData.getAsStruct( typeKey ).put( Key.functions, new Struct( TYPES.LINKED ) );
+					        final String typeName	= typeKey.getName().toLowerCase();
+					        final String typeClassName = boxTypeClasses.getOrDefault( typeName, typeName );
 					        // Find our BoxLangType Class representation
-					        Element typeClass = docsEnvironment.getSpecifiedElements()
+					        Element	typeClass		= docsEnvironment.getSpecifiedElements()
 					            .stream()
 					            .filter( classElem -> {
-						            return classElem.getKind().equals( ElementKind.CLASS )
-						                &&
-						                classElem.getEnclosingElement().getSimpleName().toString().equals( "types" )
-						                &&
-						                classElem.getSimpleName().toString().toLowerCase().equals( typeKey.getName().toLowerCase() );
-					            } ).findFirst().orElse( null );
+														            return classElem.getKind().equals( ElementKind.CLASS )
+														                &&
+														                classElem.getEnclosingElement().getSimpleName().toString().equals( "types" )
+														                &&
+														                classElem.getSimpleName().toString().toLowerCase().equals( typeClassName );
+													            } )
+					            .findFirst().orElse( null );
 
 					        // Retrieve our description
 					        if ( typeClass != null ) {
@@ -140,7 +167,8 @@ public class TypeDocumentationGenerator {
 							                    functionComments != null
 							                        ? ( functionComments.getFirstSentence().stream().map( sentence -> sentence.toString() )
 							                            .collect( Collectors.joining( "" ) ) + "\n\n"
-							                            + functionComments.getPreamble().toString() + functionComments.getBody().toString().trim() ).trim()
+							                            + functionComments.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) )
+							                                .trim()
 							                        : "",
 							                    Key.arguments,
 							                    functionBlock.getParameters().size() > 0
@@ -165,7 +193,7 @@ public class TypeDocumentationGenerator {
 						            } );
 
 					        } else {
-						        typesData.getAsStruct( typeKey ).put( Key.description, "" );
+						        typesData.getAsStruct( typeKey ).put( Key.description, getNativeTypeDescription( typeName, typeKey, docsEnvironment ) );
 					        }
 
 				        }
@@ -190,6 +218,64 @@ public class TypeDocumentationGenerator {
 		    Key.inserts, inserts
 		);
 
+	}
+
+	/**
+	 * Converts inline javadoc tags such as {@code {@link Foo}} and {@code {@code bar}} to HTML code elements.
+	 */
+	private static String renderInlineTags( String text ) {
+		if ( text == null ) {
+			return null;
+		}
+		Matcher			matcher	= INLINE_TAG.matcher( text );
+		StringBuilder	result	= new StringBuilder();
+		while ( matcher.find() ) {
+			String content = matcher.group( 2 ).trim();
+			// {@link Reference label} renders the label when there is one
+			if ( matcher.group( 1 ).startsWith( "link" ) && content.contains( " " ) ) {
+				content = content.substring( content.indexOf( ' ' ) + 1 ).trim();
+			}
+			matcher.appendReplacement( result,
+			    Matcher.quoteReplacement( "<code>" + content.replace( "&", "&amp;" ).replace( "<", "&lt;" ).replace( ">", "&gt;" ) + "</code>" ) );
+		}
+		matcher.appendTail( result );
+
+		// Source comments may carry literal unicode escapes such as \u2014
+		Matcher			unicode	= UNICODE_ESCAPE.matcher( result );
+		StringBuilder	decoded	= new StringBuilder();
+		while ( unicode.find() ) {
+			unicode.appendReplacement( decoded, Matcher.quoteReplacement( String.valueOf( ( char ) Integer.parseInt( unicode.group( 1 ), 16 ) ) ) );
+		}
+		unicode.appendTail( decoded );
+		return decoded.toString();
+	}
+
+	/**
+	 * Builds a generic BoxLang description for a type which is represented by a native Java class.
+	 * The summary from the Java class javadoc is appended when it is available in the doclet environment.
+	 */
+	private static String getNativeTypeDescription( String typeName, Key typeKey, DocletEnvironment docsEnvironment ) {
+		String javaClassName = nativeTypeClasses.get( typeName );
+		if ( javaClassName == null ) {
+			return "";
+		}
+
+		String		description	= "In BoxLang, the `" + typeName + "` type is not a BoxLang-specific class. It is represented by the native Java class `"
+		    + javaClassName + "`. The member functions below are provided by the BoxLang runtime and can be called directly on the value, "
+		    + "in addition to the methods of the underlying Java class.";
+
+		TypeElement	javaClass	= docsEnvironment.getElementUtils().getTypeElement( javaClassName );
+		if ( javaClass != null ) {
+			DocCommentTree javaDocs = docsEnvironment.getDocTrees().getDocCommentTree( javaClass );
+			if ( javaDocs != null ) {
+				String summary = javaDocs.getFirstSentence().stream().map( sentence -> sentence.toString() ).collect( Collectors.joining( "" ) ).trim();
+				if ( !summary.isEmpty() ) {
+					description += "\n\n" + summary;
+				}
+			}
+		}
+
+		return description;
 	}
 
 	private static IStruct getMemberFunctionData( Element parent, BoxMember memberElement, DocletEnvironment docsEnvironment ) {
@@ -243,7 +329,7 @@ public class TypeDocumentationGenerator {
 					} else {
 						description = ( commentTree.getFirstSentence().stream().map( sentence -> sentence.toString() ).collect( Collectors.joining( "" ) )
 						    + "\n\n"
-						    + commentTree.getPreamble().toString() + commentTree.getBody().toString().trim() ).trim();
+						    + commentTree.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) ).trim();
 					}
 					memberData.put( Key.description, description );
 					commentTree.getBlockTags().stream()
@@ -274,10 +360,16 @@ public class TypeDocumentationGenerator {
 	}
 
 	private static void generateTypeTemplate( Key typeKey, IStruct typeData ) {
-		String	typeDocs			= blankTypeTemplate;
-		String	typeDescription		= typeData.getAsString( Key.description );
+		String	typeDescription		= renderInlineTags( typeData.getAsString( Key.description ) );
 		String	typeMethods			= "";
+		String	typeExamples		= "";
 		String	samplesPath			= "workbench/samples/types";
+
+		// A description file in our convention location replaces the generated description
+		String	typeDescriptionFile	= descriptionsPath + "/" + typeKey.getName().toLowerCase() + ".md";
+		if ( FileSystemUtil.exists( typeDescriptionFile ) ) {
+			typeDescription = StringCaster.cast( FileSystemUtil.read( typeDescriptionFile ) );
+		}
 
 		// Retrive any samples in our convention location
 		String	typeSamples			= samplesPath + "/" + typeKey.getName().toLowerCase() + ".md";
@@ -286,32 +378,32 @@ public class TypeDocumentationGenerator {
 			typeSamplesContent = StringCaster.cast( FileSystemUtil.read( typeSamples ) );
 		}
 
-		typeMethods += typeData.getAsStruct( Key.functions ).keySet().stream().reduce( "", ( content, memberKey ) -> {
+		typeMethods = typeData.getAsStruct( Key.functions ).keySet().stream().reduce( "", ( content, memberKey ) -> {
 			IStruct	memberData			= typeData.getAsStruct( Key.functions ).getAsStruct( memberKey );
-			String	memberDescription	= memberData.getAsString( Key.description );
+			String	memberDescription	= renderInlineTags( memberData.getAsString( Key.description ) );
 			IStruct	memberArgs			= memberData.getAsStruct( Key.arguments );
 			String	argsInline			= "";
 			String	argsTable			= "This function does not accept any arguments";
 			if ( memberArgs.size() > 0 ) {
-				argsTable	= "\n| Argument | Type | Required | Default |\n";
-				argsTable	+= "|----------|------|----------|---------|\n";
+				argsTable	= "\n| Argument | Type | Required | Description | Default |\n";
+				argsTable	+= "|----------|------|----------|-------------|---------|\n";
 				argsTable	+= memberArgs.entrySet().stream()
 				    .map( argEntry -> {
 								    Key	argKey			= argEntry.getKey();
 								    IStruct argData		= StructCaster.cast( argEntry.getValue() );
 								    String argDescription = argData.getAsString( Key.description );
-								    argDescription = ( argDescription != null ? argDescription : "" ).replace( "\n",
+								    argDescription = renderInlineTags( argDescription != null ? argDescription : "" ).replace( "\n",
 								        "<br>" );
 								    String defaultValue = argData.getAsString( Key.defaultValue );
 								    if ( defaultValue != null && !defaultValue.isEmpty() ) {
 									    defaultValue = "`" + defaultValue + "`";
-								    }
-								    if ( defaultValue == null || defaultValue.isEmpty() ) {
-									    defaultValue = "`null`";
+								    } else {
+									    defaultValue = "";
 								    }
 								    return "| `" + argKey.getName() + "` | `" + StringCaster.cast( argData.get( Key.type ) ).replace( "structloose", "struct" )
 								        + "` | `"
 								        + argData.get( Key.required ) + "` | "
+								        + argDescription + " | "
 								        + defaultValue + " |";
 							    } )
 				    .collect( Collectors.joining( "\n" ) );
@@ -322,38 +414,41 @@ public class TypeDocumentationGenerator {
 				    .collect( Collectors.joining( ", " ) );
 			}
 
-			if ( !memberArgs.isEmpty() ) {
-				memberDescription += ( memberDescription == null ? "" : "\n\n" ) + "Arguments:\n" + argsTable + "\n";
-			}
-
-			String memberSamples = samplesPath + "/member/" + typeKey.getName().toLowerCase() + "/" + memberKey.getName() + ".md";
-
+			// Retrive any per-member samples in our convention location
+			String	memberSamples			= samplesPath + "/member/" + typeKey.getName().toLowerCase() + "/" + memberKey.getName() + ".md";
+			String	memberSamplesContent	= "";
 			if ( FileSystemUtil.exists( memberSamples ) ) {
-				memberDescription += "\n\nExamples:\n" + StringCaster.cast( FileSystemUtil.read( memberSamples ) );
+				memberSamplesContent = StringCaster.cast( FileSystemUtil.read( memberSamples ) );
 			}
 
-			if ( memberDescription == null ) {
+			if ( memberDescription == null || memberDescription.isEmpty() ) {
 				memberDescription = "No description available";
 			}
 
-			// Create a collapsible section for each member function using GitBook syntax
+			// Create a collapsible section for each member function using GitBook syntax, matching the
+			// structure of the BIF documentation (Method Signature code block + Arguments table)
 			return content + "<details>\n<summary><code>" + memberKey.getName() + "(" + argsInline + ")" + "</code></summary>\n\n"
-			    + memberDescription
-			    + "\n</details>\n";
+			    + memberDescription + "\n\n"
+			    + "### Method Signature\n\n```\n" + memberKey.getName() + "(" + argsInline + ")\n```\n\n"
+			    + "### Arguments\n\n" + argsTable + "\n"
+			    + ( memberSamplesContent.isEmpty() ? "" : "\n### Examples\n\n" + memberSamplesContent + "\n" )
+			    + "</details>\n";
 		},
 		    ( a, b ) -> a + b );
 
 		if ( typeSamplesContent.length() > 0 ) {
-			typeDescription += "\n\n## Examples\n\n" + typeSamplesContent;
+			typeExamples = typeSamplesContent;
 		}
 
 		if ( typeMethods.isEmpty() ) {
 			return;
 		}
 
+		String typeDocs = blankTypeTemplate;
 		typeDocs	= typeDocs.replace( "{TypeName}", typeKey.getName() );
 		typeDocs	= typeDocs.replace( "{TypeDescription}", typeDescription == null ? "" : typeDescription );
 		typeDocs	= typeDocs.replace( "{TypeMethods}", typeMethods );
+		typeDocs	= typeDocs.replace( "{TypeExamples}", typeExamples );
 		FileSystemUtil.write( TypeDocsPath + "/" + typeKey.getName().toLowerCase() + ".md", typeDocs, "utf-8", true );
 	}
 }

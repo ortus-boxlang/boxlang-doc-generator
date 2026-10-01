@@ -25,8 +25,6 @@ plugins {
 /**
  * Project Properties
  */
-sourceCompatibility = jdkVersion
-targetCompatibility = jdkVersion
 ext {
 	buildID = System.getenv( 'BUILD_ID' ) ?: '0'
 	branch = System.getenv( 'BRANCH' ) ?: 'development'
@@ -44,9 +42,15 @@ repositories {
     mavenCentral()
 }
 
+// Until BoxLang is published to Maven Central, prefer a local BoxLang build
+// (run `./gradlew build -x test` in the BoxLang project), else the downloaded jar.
+ext.boxlangJar = file( '../boxlang/build/libs/boxlang-' + boxlangVersion + '.jar' ).exists()
+	? file( '../boxlang/build/libs/boxlang-' + boxlangVersion + '.jar' )
+	: file( 'src/test/resources/libs/boxlang-' + boxlangVersion + '.jar' )
+
 dependencies {
-	compileOnly files( 'src/test/resources/libs/boxlang-' + boxlangVersion + '.jar' )
-	testImplementation files( 'src/test/resources/libs/boxlang-' + boxlangVersion + '.jar' )
+	compileOnly files( boxlangJar )
+	testImplementation files( boxlangJar )
 	// For HTML Parsing
 	implementation 'org.jsoup:jsoup:1.19.1'
 	// Testing Frameworks
@@ -58,6 +62,8 @@ dependencies {
 }
 
 java {
+	sourceCompatibility = JavaVersion.toVersion( jdkVersion )
+	targetCompatibility = JavaVersion.toVersion( jdkVersion )
 	withJavadocJar()
 	withSourcesJar()
 }
@@ -66,7 +72,7 @@ compileJava {
 	// Compiler Options
 	options.incremental = true
 	options.encoding = 'UTF-8'
-	options.debug()
+	options.debug = true
 }
 
 sourceSets {
@@ -108,7 +114,7 @@ task generateTechnicalDocumentation( type: Javadoc ) {
 	def classPaths = new ArrayList<File>( sourceSets.main.runtimeClasspath.getFiles() )
 	classPaths.addAll( sourceSets.main.java.getFiles() )
 	classPaths.addAll( sourceSets.main.allJava.getFiles() )
-	classPaths.addAll( files( 'src/test/resources/libs/boxlang-' + boxlangVersion + '.jar' ) )
+	classPaths.add( boxlangJar )
 	options.classpath( classPaths )
 	options.addBooleanOption( "Xdoclint:none", true )
 	exclude '**/boxlang/parser/**'
