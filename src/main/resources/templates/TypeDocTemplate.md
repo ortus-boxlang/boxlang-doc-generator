@@ -7,6 +7,8 @@
 
 {TypeMethods}
 
+{TypeJavaMethods}
+
 ## Examples
 
 {TypeExamples}

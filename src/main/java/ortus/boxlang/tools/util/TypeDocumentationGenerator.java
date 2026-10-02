@@ -1,8 +1,13 @@
 package ortus.boxlang.tools.util;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -11,7 +16,6 @@ import java.util.stream.Stream;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
 import org.apache.commons.lang3.StringUtils;
@@ -44,24 +48,31 @@ import ortus.boxlang.tools.doclets.BoxLangDoclet;
 
 public class TypeDocumentationGenerator {
 
-	private static final String					docsBasePath		= "docs/boxlang-language/reference/";
-	private static final String					templatesBasePath	= "templates/";
-	private static final String					TypeDocsPath		= docsBasePath + "types";
-	private static final String					blankTypeTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "TypeDocTemplate.md" );
-	private static final String					navToken			= "(dynamic-types-nav)";
-	private static final String					descriptionsPath	= "workbench/descriptions/types";
-	private static final Pattern				INLINE_TAG			= Pattern.compile( "\\{@(code|literal|link|linkplain)\\s+([^}]*)\\}" );
-	private static final Pattern				UNICODE_ESCAPE		= Pattern.compile( "\\\\u([0-9a-fA-F]{4})" );
+	private static final String							docsBasePath		= "docs/boxlang-language/reference/";
+	private static final String							templatesBasePath	= "templates/";
+	private static final String							TypeDocsPath		= docsBasePath + "types";
+	private static final String							blankTypeTemplate	= BoxLangDoclet.getTemplateSource( templatesBasePath + "TypeDocTemplate.md" );
+	private static final String							navToken			= "(dynamic-types-nav)";
+	private static final String							descriptionsPath	= "workbench/descriptions/types";
+	private static final Pattern						INLINE_TAG			= Pattern.compile( "\\{@(code|literal|link|linkplain)\\s+([^}]*)\\}" );
+	private static final Pattern						UNICODE_ESCAPE		= Pattern.compile( "\\\\u([0-9a-fA-F]{4})" );
 
 	// BoxLang types whose class in the runtime `types` package is not named after the type
-	private static final Map<String, String>	boxTypeClasses		= Map.of(
+	private static final Map<String, String>			boxTypeClasses		= Map.of(
 	    "file", "boxfile",
 	    "set", "boxset",
-	    "stringbuilderstrict", "boxstringbuilder"
+	    "stringbuilder", "boxstringbuilder"
+	);
+
+	// Variant types which are documented on the page of the base type they are named after
+	private static final Map<BoxLangType, BoxLangType>	variantTypes		= Map.of(
+	    BoxLangType.STRING_STRICT, BoxLangType.STRING,
+	    BoxLangType.STRUCT_LOOSE, BoxLangType.STRUCT,
+	    BoxLangType.STRING_BUILDER_STRICT, BoxLangType.STRING_BUILDER
 	);
 
 	// Types with no BoxLang class are represented by a native Java class
-	private static final Map<String, String>	nativeTypeClasses	= Map.of(
+	private static final Map<String, String>			nativeTypeClasses	= Map.of(
 	    "any", "java.lang.Object",
 	    "boolean", "java.lang.Boolean",
 	    "class", "ortus.boxlang.runtime.runnables.IClassRunnable",
@@ -71,16 +82,15 @@ public class TypeDocumentationGenerator {
 	    "stringbuilder", "java.lang.StringBuilder"
 	);
 
-	private static final BoxRuntime				runtime				= BoxRuntime.getInstance();
-	private static final FunctionService		functionService		= runtime.getFunctionService();
+	private static final BoxRuntime						runtime				= BoxRuntime.getInstance();
+	private static final FunctionService				functionService		= runtime.getFunctionService();
 
-	private static final ArrayList<BoxLangType>	excludedTypes		= new ArrayList<>( List.of(
+	private static final ArrayList<BoxLangType>			excludedTypes		= new ArrayList<>( List.of(
 	    BoxLangType.CUSTOM,
 	    BoxLangType.CUSTOM2,
 	    BoxLangType.CUSTOM3,
 	    BoxLangType.DATE,
-	    BoxLangType.LIST,
-	    BoxLangType.STRING_STRICT
+	    BoxLangType.LIST
 	) );
 
 	public static IStruct generate( DocletEnvironment docsEnvironment ) {
@@ -107,10 +117,11 @@ public class TypeDocumentationGenerator {
 			    Stream.of( elem.getAnnotationsByType( BoxMember.class ) )
 			        .filter( member -> !excludedTypes.contains( member.type() ) )
 			        .forEach( member -> {
-				        Key typeKey	= Key.of( StringUtil.pascalCase( member.type().getKey().getName() ) );
+				        BoxLangType pageType = variantTypes.getOrDefault( member.type(), member.type() );
+				        Key	typeKey		= Key.of( StringUtil.pascalCase( pageType.getKey().getName() ) );
 				        String memberName = member.name();
 				        if ( memberName == null || memberName.isEmpty() ) {
-					        memberName = StringUtils.replaceOnceIgnoreCase( elem.getSimpleName().toString(), member.type().getKey().getName(), "" );
+					        memberName = StringUtils.replaceOnceIgnoreCase( elem.getSimpleName().toString(), pageType.getKey().getName(), "" );
 				        }
 				        memberName = memberName.substring( 0, 1 ).toLowerCase() + memberName.substring( 1 );
 				        final String finalMemberName = memberName;
@@ -168,7 +179,7 @@ public class TypeDocumentationGenerator {
 							                        ? ( functionComments.getFirstSentence().stream().map( sentence -> sentence.toString() )
 							                            .collect( Collectors.joining( "" ) ) + "\n\n"
 							                            + functionComments.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) )
-							                            .trim()
+							                                .trim()
 							                        : "",
 							                    Key.arguments,
 							                    functionBlock.getParameters().size() > 0
@@ -193,17 +204,30 @@ public class TypeDocumentationGenerator {
 						            } );
 
 					        } else {
-						        typesData.getAsStruct( typeKey ).put( Key.description, getNativeTypeDescription( typeName, typeKey, docsEnvironment ) );
+						        typesData.getAsStruct( typeKey ).put( Key.description, getNativeTypeDescription( typeName, typeKey ) );
 					        }
 
 				        }
 				        IStruct functions = typesData.getAsStruct( typeKey ).getAsStruct( Key.functions );
-				        functions.put( Key.of( memberName ), getMemberFunctionData( elem, member, docsEnvironment ) );
+				        Key memberKey = Key.of( memberName );
+				        // A member declared on the base type itself takes precedence over the same member on a variant type
+				        if ( !functions.containsKey( memberKey ) || member.type() == pageType ) {
+					        functions.put( memberKey, getMemberFunctionData( elem, member, docsEnvironment ) );
+				        }
 			        } );
 		    } );
 
 		typesData.keySet().stream()
 		    .forEach( key -> generateTypeTemplate( key, typesData.getAsStruct( key ) ) );
+
+		// Variant types are now documented on their base type page, so remove any page generated for them previously
+		variantTypes.keySet().forEach( variant -> {
+			try {
+				Files.deleteIfExists( Path.of( TypeDocsPath, StringUtil.pascalCase( variant.getKey().getName() ).toLowerCase() + ".md" ) );
+			} catch ( IOException e ) {
+				System.err.println( "Unable to remove the page for type " + variant + ": " + e.getMessage() );
+			}
+		} );
 
 		String inserts = typesData.keySet()
 		    .stream()
@@ -252,39 +276,80 @@ public class TypeDocumentationGenerator {
 
 	/**
 	 * Builds a generic BoxLang description for a type which is represented by a native Java class.
-	 * The summary from the Java class javadoc is appended when it is available in the doclet environment.
+	 * The summary from the JDK class javadoc is appended when it is available.
 	 */
-	private static String getNativeTypeDescription( String typeName, Key typeKey, DocletEnvironment docsEnvironment ) {
+	private static String getNativeTypeDescription( String typeName, Key typeKey ) {
 		String javaClassName = nativeTypeClasses.get( typeName );
 		if ( javaClassName == null ) {
 			return "";
 		}
 
-		String		description	= "In BoxLang, the `" + typeName + "` type is not a BoxLang-specific class. It is represented by the native Java class `"
+		String	description	= "In BoxLang, the `" + typeName + "` type is represented by the native Java class `"
 		    + javaClassName + "`. The member functions below are provided by the BoxLang runtime and can be called directly on the value, "
 		    + "in addition to the methods of the underlying Java class.";
 
-		TypeElement	javaClass	= docsEnvironment.getElementUtils().getTypeElement( javaClassName );
-		if ( javaClass != null ) {
-			DocCommentTree javaDocs = docsEnvironment.getDocTrees().getDocCommentTree( javaClass );
-			if ( javaDocs != null ) {
-				String summary = javaDocs.getFirstSentence().stream().map( sentence -> sentence.toString() ).collect( Collectors.joining( "" ) ).trim();
-				if ( !summary.isEmpty() ) {
-					description += "\n\n" + summary;
-				}
-			}
+		String	summary		= JavaClassDocs.getClassSummary( javaClassName, JavaClassDocs.getJdkVersion() );
+		if ( !summary.isEmpty() ) {
+			description += "\n\n" + summary;
 		}
 
 		return description;
 	}
 
 	/**
+	 * Documents the public, non-deprecated methods of the native Java class behind a type, from the JDK javadocs.
+	 * Java methods which share a name with a BoxLang member function are omitted, as the member function takes precedence.
+	 */
+	private static String getJavaMethodsDocs( String typeName, Set<String> memberNames ) {
+		String javaClassName = nativeTypeClasses.get( typeName );
+		if ( javaClassName == null ) {
+			return "";
+		}
+
+		int								jdkVersion	= JavaClassDocs.getJdkVersion();
+		List<JavaClassDocs.MethodDoc>	allMethods	= JavaClassDocs.getPublicMethods( javaClassName, jdkVersion );
+		List<JavaClassDocs.MethodDoc>	methods		= allMethods.stream()
+		    .filter( method -> !memberNames.contains( method.name().toLowerCase() ) )
+		    .toList();
+		if ( methods.isEmpty() ) {
+			return "";
+		}
+
+		StringBuilder docs = new StringBuilder( "## Java Methods\n\n" );
+		docs.append( "> **Use at your own risk:** These are the public methods of the native Java class `" + javaClassName + "`, documented from the "
+		    + "JDK " + jdkVersion
+		    + " javadocs. They are not part of the BoxLang API, are not tested or supported by BoxLang, and may change between Java versions."
+		    + ( methods.size() < allMethods.size()
+		        ? " Java methods with the same name as one of the BoxLang member functions above are not listed, as the BoxLang member function is called instead."
+		        : "" )
+		    + "\n\n" );
+		for ( JavaClassDocs.MethodDoc method : methods ) {
+			docs.append( "<details>\n<summary><code>" + escapeHtml( method.signature() ) + "</code></summary>\n\n" );
+			docs.append( renderInlineTags( method.description() ) ).append( "\n\n" );
+			if ( !method.parameters().isEmpty() ) {
+				docs.append( "**Parameters:**\n\n" );
+				method.parameters().forEach( ( name, description ) -> docs.append( "* `" + name + "` - " + renderInlineTags( description ) + "\n" ) );
+				docs.append( "\n" );
+			}
+			if ( !method.returns().isEmpty() ) {
+				docs.append( "**Returns:** " + renderInlineTags( method.returns() ) + "\n\n" );
+			}
+			docs.append( "</details>\n" );
+		}
+		return docs.toString();
+	}
+
+	private static String escapeHtml( String text ) {
+		return text.replace( "&", "&amp;" ).replace( "<", "&lt;" ).replace( ">", "&gt;" );
+	}
+
+	/**
 	 * Retrieves the structured data for a member function of a BoxLang type, including its arguments and documentation.
-	 * 
+	 *
 	 * @param parent
 	 * @param memberElement
 	 * @param docsEnvironment
-	 * 
+	 *
 	 * @return
 	 */
 	private static IStruct getMemberFunctionData( Element parent, BoxMember memberElement, DocletEnvironment docsEnvironment ) {
@@ -294,7 +359,8 @@ public class TypeDocumentationGenerator {
 		String		objectArg	= memberElement.objectArgument();
 
 		if ( memberName == null || memberName.isEmpty() ) {
-			memberName = StringUtils.replaceOnceIgnoreCase( parent.getSimpleName().toString(), memberType.getKey().getName(), "" );
+			memberName = StringUtils.replaceOnceIgnoreCase( parent.getSimpleName().toString(),
+			    variantTypes.getOrDefault( memberType, memberType ).getKey().getName(), "" );
 		}
 
 		try {
@@ -326,11 +392,17 @@ public class TypeDocumentationGenerator {
 				DocCommentTree	commentTree	= docsEnvironment.getDocTrees().getDocCommentTree( invokeElement );
 				String			description	= null;
 				if ( commentTree != null ) {
-					String	memberNameFinal		= memberName;
-					DocTree	specificDescription	= commentTree.getBlockTags().stream()
-					    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG ) && tag.toString().contains( "@function" )
-					        && ( ( BlockTagTree ) tag ).getTagName().equals( "function." + memberNameFinal )
-					        || ( ( BlockTagTree ) tag ).getTagName().equals( "function." + memberType + memberNameFinal ) )
+					String		memberNameFinal		= memberName;
+					// A @function tag may be named for the member, the type and member, or the BIF behind the member, in any case
+					Set<String>	descriptionTags		= Stream.of(
+					    memberNameFinal,
+					    memberType + memberNameFinal,
+					    variantTypes.getOrDefault( memberType, memberType ).getKey().getName() + memberNameFinal,
+					    descriptor.BIFDescriptor.name.getName()
+					).map( tagName -> "function." + tagName.toLowerCase() ).collect( Collectors.toSet() );
+					DocTree		specificDescription	= commentTree.getBlockTags().stream()
+					    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG )
+					        && descriptionTags.contains( ( ( BlockTagTree ) tag ).getTagName().toLowerCase() ) )
 					    .findFirst().orElse( null );
 					if ( specificDescription != null ) {
 						description = ( ( BlockTagTree ) specificDescription ).toString()
@@ -387,63 +459,66 @@ public class TypeDocumentationGenerator {
 			typeSamplesContent = StringCaster.cast( FileSystemUtil.read( typeSamples ) );
 		}
 
-		typeMethods = typeData.getAsStruct( Key.functions ).keySet().stream().reduce( "", ( content, memberKey ) -> {
-			IStruct	memberData			= typeData.getAsStruct( Key.functions ).getAsStruct( memberKey );
-			String	memberDescription	= renderInlineTags( memberData.getAsString( Key.description ) );
-			IStruct	memberArgs			= memberData.getAsStruct( Key.arguments );
-			String	argsInline			= "";
-			String	argsTable			= "This function does not accept any arguments";
-			if ( memberArgs.size() > 0 ) {
-				argsTable	= "\n| Argument | Type | Required | Description | Default |\n";
-				argsTable	+= "|----------|------|----------|-------------|---------|\n";
-				argsTable	+= memberArgs.entrySet().stream()
-				    .map( argEntry -> {
-								    Key	argKey			= argEntry.getKey();
-								    IStruct argData		= StructCaster.cast( argEntry.getValue() );
-								    String argDescription = argData.getAsString( Key.description );
-								    argDescription = renderInlineTags( argDescription != null ? argDescription : "" ).replace( "\n",
-								        "<br>" );
-								    String defaultValue = argData.getAsString( Key.defaultValue );
-								    if ( defaultValue != null && !defaultValue.isEmpty() ) {
-									    defaultValue = "`" + defaultValue + "`";
-								    } else {
-									    defaultValue = "";
-								    }
-								    return "| `" + argKey.getName() + "` | `" + StringCaster.cast( argData.get( Key.type ) ).replace( "structloose", "struct" )
-								        + "` | `"
-								        + argData.get( Key.required ) + "` | "
-								        + argDescription + " | "
-								        + defaultValue + " |";
-							    } )
-				    .collect( Collectors.joining( "\n" ) );
+		typeMethods = typeData.getAsStruct( Key.functions ).keySet().stream()
+		    .sorted( Comparator.comparing( Key::getName, String.CASE_INSENSITIVE_ORDER ) )
+		    .reduce( "", ( content, memberKey ) -> {
+			    IStruct memberData		= typeData.getAsStruct( Key.functions ).getAsStruct( memberKey );
+			    String memberDescription = renderInlineTags( memberData.getAsString( Key.description ) );
+			    IStruct memberArgs		= memberData.getAsStruct( Key.arguments );
+			    String argsInline		= "";
+			    String argsTable		= "This function does not accept any arguments";
+			    if ( memberArgs.size() > 0 ) {
+				    argsTable = "\n| Argument | Type | Required | Description | Default |\n";
+				    argsTable += "|----------|------|----------|-------------|---------|\n";
+				    argsTable += memberArgs.entrySet().stream()
+				        .map( argEntry -> {
+								        Key argKey		= argEntry.getKey();
+								        IStruct argData	= StructCaster.cast( argEntry.getValue() );
+								        String argDescription = argData.getAsString( Key.description );
+								        argDescription = renderInlineTags( argDescription != null ? argDescription : "" ).replace( "\n",
+								            "<br>" );
+								        String defaultValue = argData.getAsString( Key.defaultValue );
+								        if ( defaultValue != null && !defaultValue.isEmpty() ) {
+									        defaultValue = "`" + defaultValue + "`";
+								        } else {
+									        defaultValue = "";
+								        }
+								        return "| `" + argKey.getName() + "` | `"
+								            + StringCaster.cast( argData.get( Key.type ) ).replace( "structloose", "struct" )
+								            + "` | `"
+								            + argData.get( Key.required ) + "` | "
+								            + argDescription + " | "
+								            + defaultValue + " |";
+							        } )
+				        .collect( Collectors.joining( "\n" ) );
 
-				argsInline	= memberArgs.entrySet().stream()
-				    .map( argEntry -> ( argEntry.getKey().getName() + "=[" + StructCaster.cast( argEntry.getValue() ).getAsString( Key.type )
-				        + "]" ) )
-				    .collect( Collectors.joining( ", " ) );
-			}
+				    argsInline = memberArgs.entrySet().stream()
+				        .map( argEntry -> ( argEntry.getKey().getName() + "=[" + StructCaster.cast( argEntry.getValue() ).getAsString( Key.type )
+				            + "]" ) )
+				        .collect( Collectors.joining( ", " ) );
+			    }
 
-			// Retrive any per-member samples in our convention location
-			String	memberSamples			= samplesPath + "/member/" + typeKey.getName().toLowerCase() + "/" + memberKey.getName() + ".md";
-			String	memberSamplesContent	= "";
-			if ( FileSystemUtil.exists( memberSamples ) ) {
-				memberSamplesContent = StringCaster.cast( FileSystemUtil.read( memberSamples ) );
-			}
+			    // Retrive any per-member samples in our convention location
+			    String memberSamples		= samplesPath + "/member/" + typeKey.getName().toLowerCase() + "/" + memberKey.getName() + ".md";
+			    String memberSamplesContent	= "";
+			    if ( FileSystemUtil.exists( memberSamples ) ) {
+				    memberSamplesContent = StringCaster.cast( FileSystemUtil.read( memberSamples ) );
+			    }
 
-			if ( memberDescription == null || memberDescription.isEmpty() ) {
-				memberDescription = "No description available";
-			}
+			    if ( memberDescription == null || memberDescription.isEmpty() ) {
+				    memberDescription = "No description available";
+			    }
 
-			// Create a collapsible section for each member function using GitBook syntax, matching the
-			// structure of the BIF documentation (Method Signature code block + Arguments table)
-			return content + "<details>\n<summary><code>" + memberKey.getName() + "(" + argsInline + ")" + "</code></summary>\n\n"
-			    + memberDescription + "\n\n"
-			    + "### Method Signature\n\n```\n" + memberKey.getName() + "(" + argsInline + ")\n```\n\n"
-			    + "### Arguments\n\n" + argsTable + "\n"
-			    + ( memberSamplesContent.isEmpty() ? "" : "\n### Examples\n\n" + memberSamplesContent + "\n" )
-			    + "</details>\n";
-		},
-		    ( a, b ) -> a + b );
+			    // Create a collapsible section for each member function using GitBook syntax, matching the
+			    // structure of the BIF documentation (Method Signature code block + Arguments table)
+			    return content + "<details>\n<summary><code>" + memberKey.getName() + "(" + argsInline + ")" + "</code></summary>\n\n"
+			        + memberDescription + "\n\n"
+			        + "### Method Signature\n\n```\n" + memberKey.getName() + "(" + argsInline + ")\n```\n\n"
+			        + "### Arguments\n\n" + argsTable + "\n"
+			        + ( memberSamplesContent.isEmpty() ? "" : "\n### Examples\n\n" + memberSamplesContent + "\n" )
+			        + "</details>\n";
+		    },
+		        ( a, b ) -> a + b );
 
 		if ( typeSamplesContent.length() > 0 ) {
 			typeExamples = typeSamplesContent;
@@ -457,6 +532,10 @@ public class TypeDocumentationGenerator {
 		typeDocs	= typeDocs.replace( "{TypeName}", typeKey.getName() );
 		typeDocs	= typeDocs.replace( "{TypeDescription}", typeDescription == null ? "" : typeDescription );
 		typeDocs	= typeDocs.replace( "{TypeMethods}", typeMethods );
+		Set<String> memberNames = typeData.getAsStruct( Key.functions ).keySet().stream()
+		    .map( memberKey -> memberKey.getName().toLowerCase() )
+		    .collect( Collectors.toSet() );
+		typeDocs	= typeDocs.replace( "{TypeJavaMethods}", getJavaMethodsDocs( typeKey.getName().toLowerCase(), memberNames ) );
 		typeDocs	= typeDocs.replace( "{TypeExamples}", typeExamples );
 		FileSystemUtil.write( TypeDocsPath + "/" + typeKey.getName().toLowerCase() + ".md", typeDocs, "utf-8", true );
 	}

@@ -227,8 +227,8 @@ public class BIFDocumentationGenerator {
 					DocCommentTree commentTree = docsEnvironment.getDocTrees().getDocCommentTree( invokeElement );
 					if ( commentTree != null ) {
 						DocTree specificDescription = commentTree.getBlockTags().stream()
-						    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG ) && tag.toString().contains( "@function" )
-						        && ( ( BlockTagTree ) tag ).getTagName().equals( "function." + name ) )
+						    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG )
+						        && ( ( BlockTagTree ) tag ).getTagName().equalsIgnoreCase( "function." + name ) )
 						    .findFirst().orElse( null );
 						if ( specificDescription != null ) {
 							description = ( ( BlockTagTree ) specificDescription ).toString()
@@ -240,8 +240,8 @@ public class BIFDocumentationGenerator {
 						}
 
 						argumentsExclude = ArrayCaster.cast( commentTree.getBlockTags().stream()
-						    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG ) && tag.toString().contains( "@component" )
-						        && ( ( BlockTagTree ) tag ).getTagName().equals( "component." + name + ".arguments.exclude" ) )
+						    .filter( tag -> tag.getKind().equals( DocTree.Kind.UNKNOWN_BLOCK_TAG )
+						        && ( ( BlockTagTree ) tag ).getTagName().equalsIgnoreCase( "component." + name + ".arguments.exclude" ) )
 						    .map( tag -> ( ( BlockTagTree ) tag ).toString().replace( '@' + ( ( BlockTagTree ) tag ).getTagName(), "" ).trim() )
 						    .findFirst().orElse( "" ).split( "," ) );
 
