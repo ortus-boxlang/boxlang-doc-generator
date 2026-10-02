@@ -179,7 +179,7 @@ public class TypeDocumentationGenerator {
 							                        ? ( functionComments.getFirstSentence().stream().map( sentence -> sentence.toString() )
 							                            .collect( Collectors.joining( "" ) ) + "\n\n"
 							                            + functionComments.getBody().stream().map( tag -> tag.toString() ).collect( Collectors.joining( "" ) ) )
-							                                .trim()
+							                            .trim()
 							                        : "",
 							                    Key.arguments,
 							                    functionBlock.getParameters().size() > 0
